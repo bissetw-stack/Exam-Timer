@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full select-none">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Exam & Assessment Hall Timer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+                    },
+                    colors: {
+                        navy: {
+                            800: '#0f172a',
+                            900: '#0b1329',
+                            950: '#030712'
+                        }
+                    },
+                    keyframes: {
+                        ticker: {
+                            '0%': { transform: 'translateX(100%)' },
+                            '100%': { transform: 'translateX(-100%)' }
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { opacity: 0.8, transform: 'scale(1)' },
+                            '50%': { opacity: 1, transform: 'scale(1.03)' }
+                        }
+                    },
+                    animation: {
+                        'ticker': 'ticker 28s linear infinite',
+                        'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'pulse-fast': 'pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800;900&display=swap');
+        
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Glassmorphism styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .light-theme .glass-panel {
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            color: #0f172a;
+        }
+
+        /* High Contrast Yellow/Black Theme */
+        .high-contrast-theme {
+            background-color: #000000 !important;
+            color: #ffff00 !important;
+        }
+        .high-contrast-theme .glass-panel {
+            background: #111111 !important;
+            border: 2px solid #ffff00 !important;
+            color: #ffff00 !important;
+        }
+        .high-contrast-theme .hc-text {
+            color: #ffff00 !important;
+            text-shadow: none !important;
+        }
+        .high-contrast-theme .hc-button {
+            background: #ffff00 !important;
+            color: #000000 !important;
+            font-weight: 900 !important;
+        }
+
+        /* Ultra Large Timer Typography Clamp */
+        .timer-digits {
+            font-size: clamp(5.5rem, 21vw, 18rem);
+            line-height: 0.85;
+            letter-spacing: -0.04em;
+        }
+
+        /* DYNAMIC NEON GLOW EFFECTS (3 Levels: off, soft, hall) */
+        
+        /* 1. Standard Writing Phase (Cyan/Teal) */
+        .glow-hall.phase-writing-glow {
+            text-shadow: 
+                0 0 15px rgba(56, 189, 248, 0.8),
+                0 0 35px rgba(56, 189, 248, 0.5),
+                0 0 75px rgba(6, 182, 212, 0.4),
+                0 0 120px rgba(6, 182, 212, 0.25);
+        }
+        .glow-soft.phase-writing-glow {
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+        }
+
+        /* 2. Reading Phase (Purple/Violet) */
+        .glow-hall.phase-reading-glow {
+            text-shadow: 
+                0 0 15px rgba(192, 132, 252, 0.9),
+                0 0 35px rgba(168, 85, 247, 0.6),
+                0 0 75px rgba(147, 51, 234, 0.45),
+                0 0 120px rgba(126, 34, 206, 0.3);
+        }
+        .glow-soft.phase-reading-glow {
+            text-shadow: 0 0 20px rgba(192, 132, 252, 0.5);
+        }
+
+        /* 3. Warning Phase - Under 10 mins (Amber/Orange) */
+        .glow-hall.phase-warning-glow {
+            text-shadow: 
+                0 0 15px rgba(251, 191, 36, 0.95),
+                0 0 35px rgba(245, 158, 11, 0.7),
+                0 0 80px rgba(217, 119, 6, 0.5),
+                0 0 130px rgba(180, 83, 9, 0.35);
+        }
+        .glow-soft.phase-warning-glow {
+            text-shadow: 0 0 25px rgba(251, 191, 36, 0.6);
+        }
+
+        /* 4. Critical / Expired Phase - Under 1 min or 00:00 (Red) */
+        .glow-hall.phase-critical-glow {
+            text-shadow: 
+                0 0 18px rgba(248, 113, 113, 1),
+                0 0 40px rgba(239, 68, 68, 0.8),
+                0 0 90px rgba(220, 38, 38, 0.6),
+                0 0 150px rgba(185, 28, 28, 0.45);
+        }
+        .glow-soft.phase-critical-glow {
+            text-shadow: 0 0 25px rgba(248, 113, 113, 0.7);
+        }
+
+        /* Ambient Ambient Backdrop Spotlights */
+        .ambient-spotlight {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70vw;
+            height: 50vh;
+            border-radius: 50%;
+            filter: blur(120px);
+            pointer-events: none;
+            opacity: 0.25;
+            transition: all 1s ease;
+        }
+
+        /* Simulated Fullscreen Fallback for Sandboxed iFrames */
+        .is-simulated-fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 9999 !important;
+            overflow: hidden !important;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body id="appBody" class="h-full bg-slate-950 text-slate-100 font-sans overflow-hidden transition-colors duration-500 relative">
+
+    <!-- AMBIENT BACKGROUND SPOTLIGHT (Projects colorful glow behind giant clock) -->
+    <div id="ambientSpotlight" class="ambient-spotlight bg-sky-500/20"></div>
+
+    <!-- MAIN EXAM HALL SCREEN CONTAINER -->
+    <div id="mainContainer" class="h-full w-full flex flex-col justify-between p-3 sm:p-5 md:p-8 relative z-10">
+
+        <!-- HEADER BAR: SUBJECT, ROOM, REALTIME CLOCK & EQUIPMENT -->
+        <header class="w-full flex flex-col md:flex-row md:items-start justify-between gap-3 z-20">
+            
+            <!-- Left Header: Title, Code, Room & Marks -->
+            <div class="space-y-1.5 max-w-3xl">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span id="subjectBadge" class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hc-text">
+                        BIOL302 - PAPER 2
+                    </span>
+                    <span id="roomBadge" class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-800/90 text-slate-300 border border-slate-700 hc-text">
+                        Room: Great Examination Hall
+                    </span>
+                    <span id="marksBadge" class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-800/90 text-slate-300 border border-slate-700 hc-text">
+                        Total Marks: 100
+                    </span>
+                    <span id="wakeLockStatus" class="inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                        Screen Active
+                    </span>
+                </div>
+
+                <h1 id="examTitleDisplay" class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-white hc-text leading-tight drop-shadow-md">
+                    A-Level Biology - Final Written Assessment
+                </h1>
+            </div>
+
+            <!-- Right Header: Real-Time Live Clock & Allowed Equipment -->
+            <div class="flex flex-col items-start md:items-end gap-2">
+                <!-- Live Real-Time Current Clock -->
+                <div class="glass-panel px-4 py-2 rounded-2xl flex items-center gap-3 shadow-xl">
+                    <div class="text-right">
+                        <div id="realtimeClock" class="font-mono text-xl sm:text-2xl md:text-3xl font-black text-white tabular-nums hc-text">
+                            00:00:00
+                        </div>
+                        <div id="realtimeDate" class="text-[11px] text-slate-400 font-medium hc-text">
+                            ---, -- ---- ----
+                        </div>
+                    </div>
+                    <button onclick="toggleClockFormat()" title="Toggle 12h/24h Clock" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1.5 rounded-lg border border-slate-700 font-mono transition">
+                        <span id="clockFormatLabel">24H</span>
+                    </button>
+                </div>
+
+                <!-- Allowed Equipment Badges -->
+                <div id="equipmentContainer" class="flex flex-wrap items-center gap-1.5 max-w-md justify-start md:justify-end">
+                    <!-- Rendered dynamically -->
+                </div>
+            </div>
+
+        </header>
+
+
+        <!-- CENTER AREA: ULTRA-LARGE HALL CLOCK & PHASE STATUS -->
+        <main class="my-auto flex flex-col items-center justify-center text-center z-10 py-1 sm:py-2">
+            
+            <!-- Phase Status Indicator -->
+            <div class="mb-2 sm:mb-4">
+                <div id="phaseBadge" class="inline-flex items-center gap-2.5 px-6 py-2 rounded-full text-xs sm:text-sm md:text-base font-black tracking-widest uppercase transition-all duration-300 bg-slate-800/90 text-slate-200 border border-slate-700/80 shadow-2xl backdrop-blur">
+                    <span id="phaseDot" class="w-3.5 h-3.5 rounded-full bg-slate-400"></span>
+                    <span id="phaseText">READY TO START</span>
+                </div>
+            </div>
+
+            <!-- Giant Hall Countdown Timer (Viewable from back of room) -->
+            <div class="relative my-1 w-full max-w-7xl flex flex-col items-center justify-center">
+                <div id="timeDisplay" class="timer-digits font-mono font-extrabold tabular-nums transition-all duration-500 text-sky-400 glow-hall phase-writing-glow hc-text">
+                    01:30:00
+                </div>
+
+                <!-- Multi-Phase Visual Progress Bar -->
+                <div class="w-full max-w-4xl bg-slate-900/90 rounded-full h-4 sm:h-5 p-1 backdrop-blur border border-slate-800 shadow-inner mt-4 sm:mt-6">
+                    <div id="progressBar" class="bg-gradient-to-r from-sky-500 to-cyan-400 h-full rounded-full transition-all duration-1000 ease-linear w-full shadow-lg"></div>
+                </div>
+            </div>
+
+            <!-- Target Schedule Summary -->
+            <div class="mt-4 sm:mt-6 flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs sm:text-base text-slate-300 font-medium hc-text">
+                <div class="flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-800 shadow">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Started: <strong id="startTimeDisplay" class="text-white hc-text font-bold">--:--</strong></span>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-800 shadow">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Estimated Finish: <strong id="targetEndTimeDisplay" class="text-white hc-text font-bold">--:--</strong></span>
+                </div>
+                <div id="extraTimeIndicator" class="hidden flex items-center gap-1.5 bg-purple-500/20 text-purple-300 px-3.5 py-2 rounded-xl border border-purple-500/30 text-xs font-bold">
+                    <span id="extraTimeBadgeText">⚡ Extra Time Applied</span>
+                </div>
+            </div>
+
+        </main>
+
+
+        <!-- BOTTOM BAR: NOTICEBOARD TICKER & EXAM GUIDELINES -->
+        <footer class="w-full space-y-3 z-20">
+            
+            <!-- Live Teacher Broadcast Notice Banner -->
+            <div id="announcementBanner" class="hidden relative overflow-hidden rounded-2xl bg-amber-500/20 border-2 border-amber-500/50 p-3.5 backdrop-blur-md text-amber-200 shadow-2xl">
+                <div class="flex items-center gap-3">
+                    <span class="flex-shrink-0 bg-amber-500 text-slate-950 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                        EXAM NOTICE
+                    </span>
+                    <div class="overflow-hidden whitespace-nowrap w-full">
+                        <div id="announcementText" class="inline-block text-sm md:text-base font-bold text-amber-100 animate-ticker">
+                            Silence must be maintained at all times. Check both sides of your question paper.
+                        </div>
+                    </div>
+                    <button onclick="dismissAnnouncement()" class="flex-shrink-0 text-amber-300 hover:text-white p-1 rounded-lg hover:bg-amber-500/20">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Guidelines Summary Bar -->
+            <div id="rulesBar" class="glass-panel p-3 md:p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs md:text-sm text-slate-300">
+                <div class="flex items-center gap-2 font-black text-slate-100 flex-shrink-0 hc-text">
+                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Exam Instructions:</span>
+                </div>
+                <div id="rulesList" class="flex flex-wrap items-center gap-x-6 gap-y-1 text-slate-300 hc-text">
+                    <span>• Strict exam conditions apply</span>
+                    <span>• Raise hand for invigilator assistance</span>
+                    <span>• Ensure mobile devices are turned off</span>
+                </div>
+            </div>
+
+        </footer>
+
+
+        <!-- FLOATING AUTO-HIDING CONTROL DOCK -->
+        <div id="controlDock" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 transition-all duration-500">
+            <div class="glass-panel px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border border-slate-700/60 bg-slate-900/90">
+                
+                <!-- Play / Pause Button -->
+                <button id="btnPlayPause" onclick="toggleTimer()" title="Start / Pause Timer" class="p-3.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition font-extrabold shadow-lg shadow-emerald-500/20 flex items-center justify-center hc-button">
+                    <svg id="playIcon" class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                    <svg id="pauseIcon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5 0a1 1 0 012 0v4a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
+                </button>
+
+                <!-- Reset Button -->
+                <button onclick="resetTimer()" title="Reset Timer" class="p-2.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+
+                <!-- Finish Exam Early Button -->
+                <button onclick="finishExamEarly()" title="Finish Exam Early" class="p-2.5 rounded-full hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                </button>
+
+                <div class="h-6 w-px bg-slate-700/60 mx-1"></div>
+
+                <!-- Quick Adjust Buttons (+1m, +5m, +10m) -->
+                <button onclick="adjustTime(60)" title="Add 1 Minute" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+                    +1m
+                </button>
+                <button onclick="adjustTime(300)" title="Add 5 Minutes" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+                    +5m
+                </button>
+                <button onclick="adjustTime(600)" title="Add 10 Minutes" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+                    +10m
+                </button>
+
+                <div class="h-6 w-px bg-slate-700/60 mx-1"></div>
+
+                <!-- Broadcast Announcement Modal Toggle -->
+                <button onclick="openModal('announcementModal')" title="Broadcast Notice" class="p-2.5 rounded-full hover:bg-slate-800 text-amber-400 hover:text-amber-300 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 000-6M5.436 13.683A4.001 4.001 0 017 6h1.832c.41 0 .824-.158 1.127-.442l2.546-2.402a1.76 1.76 0 012.98 1.25V19.59a1.76 1.76 0 01-2.98 1.25l-2.546-2.402a1.76 1.76 0 00-1.127-.442H7c-.88 0-1.704.307-2.355.845"/></svg>
+                </button>
+
+                <!-- Sound Toggle -->
+                <button id="btnMute" onclick="toggleMute()" title="Mute / Unmute" class="p-2.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition">
+                    <svg id="soundOnIcon" class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                    <svg id="soundOffIcon" class="w-5 h-5 text-slate-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+                </button>
+
+                <!-- Config Modal Open Button -->
+                <button onclick="openModal('settingsModal')" title="Exam Settings & Setup" class="p-2.5 rounded-full hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </button>
+
+                <!-- Fullscreen Toggle -->
+                <button onclick="toggleFullscreen()" title="Toggle Fullscreen" class="p-2.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                </button>
+
+                <!-- Collapse / Hide Dock Toggle -->
+                <button onclick="manualHideDock()" id="btnCollapseDock" title="Hide Toolbar for Presentation" class="p-2.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Floating Restore Dock Button (When manually collapsed or hidden) -->
+        <button id="btnRestoreDock" onclick="showDock()" title="Show Presentation Controls" class="hidden fixed bottom-3 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full bg-slate-900/90 text-slate-200 hover:text-white text-xs font-bold border border-slate-700/60 shadow-2xl backdrop-blur flex items-center gap-2">
+            <span>▲ Controls</span>
+        </button>
+
+    </div>
+
+
+    <!-- MODAL 1: COMPLETE EXAM CONFIGURATION & DURATION SETUP -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                <h2 class="text-xl font-black text-white flex items-center gap-2.5">
+                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Exam Setup & Projection Settings
+                </h2>
+                <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Modal Body Scrollable -->
+            <div class="p-6 overflow-y-auto space-y-6 text-sm text-slate-300">
+                
+                <!-- 1. DURATION INPUTS: HOURS, MINUTES, SECONDS -->
+                <div class="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400">1. Exam Writing Duration</h3>
+                        <span class="text-xs text-slate-400">Hours : Minutes : Seconds</span>
+                    </div>
+
+                    <!-- Numerical Input Spinners with Increments -->
+                    <div class="grid grid-cols-3 gap-3">
+                        <!-- Hours Input -->
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">Hours (0-24)</label>
+                            <div class="flex items-center justify-center gap-2">
+                                <button type="button" onclick="stepVal('inputHours', -1, 0, 24)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg">-</button>
+                                <input id="inputHours" type="number" min="0" max="24" value="1" class="w-16 text-center bg-slate-950 border border-slate-700 rounded-lg py-1.5 text-white font-mono text-xl font-bold focus:outline-none focus:border-indigo-500">
+                                <button type="button" onclick="stepVal('inputHours', 1, 0, 24)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Minutes Input -->
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">Minutes (0-59)</label>
+                            <div class="flex items-center justify-center gap-2">
+                                <button type="button" onclick="stepVal('inputMinutes', -5, 0, 59)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg">-</button>
+                                <input id="inputMinutes" type="number" min="0" max="59" value="30" class="w-16 text-center bg-slate-950 border border-slate-700 rounded-lg py-1.5 text-white font-mono text-xl font-bold focus:outline-none focus:border-indigo-500">
+                                <button type="button" onclick="stepVal('inputMinutes', 5, 0, 59)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Seconds Input -->
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">Seconds (0-59)</label>
+                            <div class="flex items-center justify-center gap-2">
+                                <button type="button" onclick="stepVal('inputSeconds', -10, 0, 59)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg">-</button>
+                                <input id="inputSeconds" type="number" min="0" max="59" value="0" class="w-16 text-center bg-slate-950 border border-slate-700 rounded-lg py-1.5 text-white font-mono text-xl font-bold focus:outline-none focus:border-indigo-500">
+                                <button type="button" onclick="stepVal('inputSeconds', 10, 0, 59)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Extended Quick Presets Chips -->
+                    <div class="space-y-1.5 pt-2">
+                        <label class="block text-[11px] font-semibold text-slate-400">Quick Exam Duration Presets:</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" onclick="applyQuickDuration(0, 15, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">15m</button>
+                            <button type="button" onclick="applyQuickDuration(0, 30, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">30m</button>
+                            <button type="button" onclick="applyQuickDuration(0, 45, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">45m</button>
+                            <button type="button" onclick="applyQuickDuration(1, 0, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">1h</button>
+                            <button type="button" onclick="applyQuickDuration(1, 15, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">1h 15m</button>
+                            <button type="button" onclick="applyQuickDuration(1, 30, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">1h 30m</button>
+                            <button type="button" onclick="applyQuickDuration(1, 45, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">1h 45m</button>
+                            <button type="button" onclick="applyQuickDuration(2, 0, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">2h</button>
+                            <button type="button" onclick="applyQuickDuration(2, 30, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">2h 30m</button>
+                            <button type="button" onclick="applyQuickDuration(3, 0, 0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200">3h</button>
+                        </div>
+                    </div>
+
+                    <!-- Accommodation / Extra Time Calculator -->
+                    <div class="pt-3 border-t border-slate-800/80 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-black uppercase text-purple-400">Accommodations & Access Arrangements Calculator</label>
+                            <span id="extraTimeSummaryLabel" class="text-xs text-purple-300 font-bold">Standard Time</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" onclick="applyExtraTime(10)" class="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold">
+                                +10%
+                            </button>
+                            <button type="button" onclick="applyExtraTime(25)" class="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold">
+                                +25%
+                            </button>
+                            <button type="button" onclick="applyExtraTime(33)" class="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold">
+                                +33%
+                            </button>
+                            <button type="button" onclick="applyExtraTime(50)" class="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-bold">
+                                +50%
+                            </button>
+                            <button type="button" onclick="applyCustomExtraTime()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">
+                                Custom %
+                            </button>
+                            <button type="button" onclick="removeExtraTime()" class="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white underline">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 2. READING TIME SETUP -->
+                <div class="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    <h3 class="text-xs font-black uppercase tracking-wider text-purple-400">2. Reading / Planning Phase</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Reading Minutes</label>
+                            <input id="inputReadingMins" type="number" min="0" max="60" value="10" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono font-bold focus:outline-none focus:border-purple-500">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-slate-400 mb-1">On Reading Finish Action</label>
+                            <select id="selectAutoStart" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-purple-500 text-xs">
+                                <option value="true">Automatically start Writing phase with chime</option>
+                                <option value="false">Pause timer & await invigilator Play button</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 3. ASSESSMENT INFORMATION -->
+                <div class="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400">3. Assessment Header & Hall Info</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Assessment Title</label>
+                            <input id="inputTitle" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500" placeholder="e.g. A-Level Biology - Final Assessment">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Subject / Paper Code</label>
+                            <input id="inputSubject" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500" placeholder="e.g. BIOL302 - PAPER 2">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Centre / Room / Hall Name</label>
+                            <input id="inputRoom" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500" placeholder="e.g. Great Examination Hall">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Total Paper Marks</label>
+                            <input id="inputMarks" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500" placeholder="e.g. 100">
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 4. PERMITTED EQUIPMENT BADGES -->
+                <div class="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400">4. Permitted Equipment Badges</h3>
+                    <div id="equipmentCheckboxes" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <!-- Toggles rendered dynamically -->
+                    </div>
+                </div>
+
+
+                <!-- 5. RULES & GUIDELINES -->
+                <div class="space-y-2 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    <label class="block text-xs font-black uppercase text-indigo-400">5. Student Guidelines (One bullet point per line)</label>
+                    <textarea id="inputRules" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500 text-xs" placeholder="e.g. Strict exam conditions apply&#10;Raise hand for invigilator assistance"></textarea>
+                </div>
+
+
+                <!-- 6. GLOW INTENSITY, THEME & AUDIO -->
+                <div class="space-y-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400">6. Projection Glow Intensity, Theme & Sound</h3>
+                    
+                    <!-- Glow Level Select -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Timer Glow Intensity</label>
+                            <select id="selectGlowIntensity" onchange="setGlowIntensity(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500 text-xs">
+                                <option value="hall">Hall Neon (High Ambient Projection Glow)</option>
+                                <option value="soft">Soft Ambient Glow</option>
+                                <option value="off">Off (Clean Solid Numbers)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Audio Alert Sound Choice</label>
+                            <div class="flex gap-2">
+                                <select id="selectSoundPreset" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-medium focus:outline-none focus:border-indigo-500 text-xs">
+                                    <option value="chime">Resonant Synth Chime</option>
+                                    <option value="gong">Zen Acoustic Gong</option>
+                                    <option value="bell">Classroom Bell</option>
+                                    <option value="digital">Digital Alarm Beep</option>
+                                </select>
+                                <button type="button" onclick="testSelectedSound()" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1 flex-shrink-0">
+                                    ▶ Test
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Volume & Themes -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800/60">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Volume Level: <span id="volumeValLabel" class="text-white font-bold">80%</span></label>
+                            <input id="inputVolume" type="range" min="0" max="100" value="80" oninput="updateVolumeLabel(this.value)" class="w-full accent-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Visual Color Theme</label>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <button type="button" onclick="setTheme('dark')" class="p-2 rounded-lg border border-slate-800 bg-slate-950 text-white font-bold text-xs flex items-center justify-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Dark OLED
+                                </button>
+                                <button type="button" onclick="setTheme('navy')" class="p-2 rounded-lg border border-slate-800 bg-navy-900 text-sky-200 font-bold text-xs flex items-center justify-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Focus Navy
+                                </button>
+                                <button type="button" onclick="setTheme('light')" class="p-2 rounded-lg border border-slate-300 bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-slate-800"></span> Light Mode
+                                </button>
+                                <button type="button" onclick="setTheme('highcontrast')" class="p-2 rounded-lg border border-yellow-400 bg-black text-yellow-300 font-bold text-xs flex items-center justify-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span> High Contrast
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 7. SAVED PRESETS -->
+                <div class="space-y-3 pt-2">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400">Exam Presets Storage</h3>
+                        <button type="button" onclick="saveCurrentAsPreset()" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
+                            + Save Current Setup
+                        </button>
+                    </div>
+                    <div id="presetsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-5 border-t border-slate-800 bg-slate-900/80 flex justify-end gap-3">
+                <button onclick="closeModal('settingsModal')" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition">
+                    Cancel
+                </button>
+                <button onclick="applySettings()" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-lg shadow-indigo-600/30">
+                    Apply & Save Setup
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- MODAL 2: TEACHER ANNOUNCEMENT BROADCAST -->
+    <div id="announcementModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-black text-white flex items-center gap-2">
+                    <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 000-6M5.436 13.683A4.001 4.001 0 017 6h1.832c.41 0 .824-.158 1.127-.442l2.546-2.402a1.76 1.76 0 012.98 1.25V19.59a1.76 1.76 0 01-2.98 1.25l-2.546-2.402a1.76 1.76 0 00-1.127-.442H7c-.88 0-1.704.307-2.355.845"/></svg>
+                    Broadcast Notice to Hall
+                </h2>
+                <button onclick="closeModal('announcementModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-400">
+                Type an urgent notice or paper correction. This text will scroll smoothly across the hall screen accompanied by a soft alert chime.
+            </p>
+
+            <textarea id="inputAnnouncementText" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500 text-sm font-medium" placeholder="e.g. Question 4 Correction: The formula on page 8 should read H2SO4 instead of H2SO3."></textarea>
+
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button onclick="closeModal('announcementModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-sm">
+                    Cancel
+                </button>
+                <button onclick="postAnnouncement()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm transition shadow-lg shadow-amber-500/20">
+                    Broadcast Notice
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JAVASCRIPT APPLICATION CODE -->
+    <script>
+        /* ==========================================================================
+           1. DATA STRUCTURES & CONFIGURATION
+           ========================================================================== */
+        
+        const ALL_EQUIPMENT = [
+            { id: 'calc', name: 'Calculators Allowed', icon: '🧮' },
+            { id: 'nocalc', name: 'No Calculators', icon: '🚫🧮' },
+            { id: 'formula', name: 'Formula Sheet Included', icon: '📋' },
+            { id: 'dict', name: 'Bilingual Dictionary', icon: '📖' },
+            { id: 'blackpen', name: 'Black Ink Pen Only', icon: '✒️' },
+            { id: 'notes', name: 'Open Book / Notes', icon: '📚' },
+            { id: 'ruler', name: 'Ruler & Geometry Kit', icon: '📐' },
+            { id: 'water', name: 'Clear Water Bottle', icon: '💧' },
+            { id: 'nophones', name: 'No Watches / Phones', icon: '📱❌' }
+        ];
+
+        const DEFAULT_PRESETS = [
+            { id: 'p1', name: '1 Hour Standard Assessment', hours: 1, minutes: 0, seconds: 0, readingMins: 0, autoStart: true, equipment: ['calc', 'blackpen', 'nophones'] },
+            { id: 'p2', name: '1h 30m Exam + 10m Reading', hours: 1, minutes: 30, seconds: 0, readingMins: 10, autoStart: true, equipment: ['calc', 'formula', 'ruler', 'water', 'nophones'] },
+            { id: 'p3', name: '2 Hour Final + 15m Reading', hours: 2, minutes: 0, seconds: 0, readingMins: 15, autoStart: false, equipment: ['calc', 'dict', 'water', 'nophones'] },
+            { id: 'p4', name: '45 Min Class Test', hours: 0, minutes: 45, seconds: 0, readingMins: 0, autoStart: true, equipment: ['nocalc', 'blackpen'] }
+        ];
+
+        let state = {
+            examTitle: "A-Level Biology - Final Written Assessment",
+            subject: "BIOL302 - PAPER 2",
+            room: "Great Examination Hall",
+            marks: "100",
+            
+            // Duration setup
+            hours: 1,
+            minutes: 30,
+            seconds: 0,
+            
+            baseHours: 1,
+            baseMinutes: 30,
+            baseSeconds: 0,
+            extraTimePct: 0, // e.g. 10, 25, 33, 50
+
+            readingMins: 10,
+            autoStartWriting: true,
+            selectedEquipment: ['calc', 'formula', 'ruler', 'water', 'nophones'],
+            rules: [
+                "Strict examination conditions apply at all times",
+                "Raise hand for additional paper or invigilator help",
+                "Ensure mobile phones and smartwatches are completely turned off"
+            ],
+            
+            // Display Preferences
+            theme: 'dark',
+            glowIntensity: 'hall', // 'off', 'soft', 'hall'
+            use24HourClock: true,
+            soundPreset: 'chime',
+            volume: 0.8,
+            isMuted: false,
+
+            // Timer Runtime State
+            phase: 'idle', // 'idle', 'reading', 'writing', 'paused', 'finished'
+            timeRemainingSec: 0,
+            totalPhaseSec: 0,
+            startTime: null,
+            targetEndTime: null,
+
+            // Alert tracking
+            soundPlayed15m: false,
+            soundPlayed5m: false,
+            soundPlayed1m: false,
+            soundPlayedDone: false
+        };
+
+        let timerInterval = null;
+        let realTimeInterval = null;
+        let wakeLockObj = null;
+        let dockHideTimeout = null;
+
+        /* ==========================================================================
+           2. WEB AUDIO API SYNTHESIZER (No External Files)
+           ========================================================================== */
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(err => console.warn('Audio resume exception:', err));
+            }
+            return audioCtx;
+        }
+
+        function playSynthTone(freq, type, duration, delay = 0, gainLevel = 0.3) {
+            if (state.isMuted || state.volume <= 0) return;
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+
+                const finalGain = gainLevel * state.volume;
+                gain.gain.setValueAtTime(finalGain, ctx.currentTime + delay);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + duration);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + duration);
+            } catch (e) {
+                console.error("Audio synth error:", e);
+            }
+        }
+
+        function triggerSound(typeKey) {
+            const preset = state.soundPreset;
+
+            if (preset === 'gong') {
+                // Zen Acoustic Gong
+                playSynthTone(108, 'sine', 3.5, 0, 0.5);
+                playSynthTone(162, 'triangle', 2.8, 0.05, 0.3);
+                playSynthTone(216, 'sine', 2.2, 0.1, 0.2);
+            } else if (preset === 'bell') {
+                // Classroom High Bell
+                playSynthTone(880, 'sine', 1.6, 0, 0.4);
+                playSynthTone(1760, 'sine', 1.2, 0.1, 0.25);
+            } else if (preset === 'digital') {
+                // Digital Alarm Beep
+                playSynthTone(1046.50, 'square', 0.15, 0, 0.25);
+                playSynthTone(1046.50, 'square', 0.15, 0.2, 0.25);
+                if (typeKey === 'done') {
+                    playSynthTone(1046.50, 'square', 0.5, 0.4, 0.3);
+                }
+            } else {
+                // Resonant Synth Chime
+                if (typeKey === 'start') {
+                    playSynthTone(523.25, 'sine', 0.5, 0, 0.3);
+                    playSynthTone(659.25, 'sine', 0.8, 0.15, 0.3);
+                } else if (typeKey === 'warn') {
+                    playSynthTone(587.33, 'triangle', 0.4, 0, 0.4);
+                    playSynthTone(587.33, 'triangle', 0.4, 0.2, 0.4);
+                } else if (typeKey === 'notice') {
+                    playSynthTone(659.25, 'sine', 0.3, 0, 0.3);
+                    playSynthTone(880, 'sine', 0.6, 0.15, 0.3);
+                } else {
+                    const freqs = [261.63, 523.25, 659.25, 783.99, 1046.50];
+                    freqs.forEach(f => playSynthTone(f, 'sine', 3.2, 0, 0.25));
+                }
+            }
+        }
+
+        function testSelectedSound() {
+            getAudioContext();
+            triggerSound('done');
+        }
+
+        function updateVolumeLabel(val) {
+            state.volume = val / 100;
+            document.getElementById('volumeValLabel').textContent = `${val}%`;
+        }
+
+
+        /* ==========================================================================
+           3. SCREEN WAKE LOCK & FULLSCREEN HANDLERS (iPad / Safari / Windows)
+           ========================================================================== */
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockObj = await navigator.wakeLock.request('screen');
+                    document.getElementById('wakeLockStatus').classList.remove('hidden');
+                } else {
+                    document.getElementById('wakeLockStatus').classList.add('hidden');
+                }
+            } catch (err) {
+                console.log('WakeLock error:', err);
+                document.getElementById('wakeLockStatus').classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLockObj !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
+        function toggleFullscreen() {
+            try {
+                const elem = document.documentElement;
+                const isFS = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+                if (!isFS) {
+                    let promise = null;
+                    if (elem.requestFullscreen) {
+                        promise = elem.requestFullscreen();
+                    } else if (elem.webkitRequestFullscreen) { /* iPad Safari */
+                        promise = elem.webkitRequestFullscreen();
+                    } else if (elem.msRequestFullscreen) {
+                        promise = elem.msRequestFullscreen();
+                    }
+
+                    if (promise && promise.catch) {
+                        promise.catch(err => {
+                            console.warn("Native browser fullscreen blocked by iframe permissions policy:", err);
+                            toggleSimulatedFullscreen();
+                        });
+                    }
+                } else {
+                    let promise = null;
+                    if (document.exitFullscreen) {
+                        promise = document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        promise = document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        promise = document.msExitFullscreen();
+                    }
+
+                    if (promise && promise.catch) {
+                        promise.catch(err => console.warn("Exit fullscreen error:", err));
+                    }
+                }
+            } catch (err) {
+                console.warn("Fullscreen API exception:", err);
+                toggleSimulatedFullscreen();
+            }
+        }
+
+        function toggleSimulatedFullscreen() {
+            const isSimulated = document.body.classList.toggle('is-simulated-fullscreen');
+            showToast(isSimulated ? "Expanded presentation mode active" : "Normal view restored");
+        }
+
+        function showToast(message) {
+            let toast = document.getElementById('appToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'appToast';
+                toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900/95 text-slate-100 text-xs font-semibold px-4 py-2.5 rounded-2xl border border-slate-700 shadow-2xl backdrop-blur transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-2';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.classList.remove('opacity-0', '-translate-y-2', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+                toast.classList.remove('opacity-100', 'translate-y-0');
+            }, 3500);
+        }
+
+        /* ==========================================================================
+           4. DOCK AUTO-HIDE ON INACTIVITY
+           ========================================================================== */
+        function resetDockAutoHideTimer() {
+            const dock = document.getElementById('controlDock');
+            const restoreBtn = document.getElementById('btnRestoreDock');
+
+            // Always show on hover or interaction
+            if (dock.classList.contains('translate-y-28')) {
+                dock.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+                restoreBtn.classList.add('hidden');
+            }
+
+            clearTimeout(dockHideTimeout);
+            // Auto hide dock only when timer is running (writing or reading)
+            if (state.phase === 'writing' || state.phase === 'reading') {
+                dockHideTimeout = setTimeout(() => {
+                    dock.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+                    restoreBtn.classList.remove('hidden');
+                }, 3500);
+            }
+        }
+
+        function manualHideDock() {
+            const dock = document.getElementById('controlDock');
+            const restoreBtn = document.getElementById('btnRestoreDock');
+            dock.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+            restoreBtn.classList.remove('hidden');
+        }
+
+        function showDock() {
+            const dock = document.getElementById('controlDock');
+            const restoreBtn = document.getElementById('btnRestoreDock');
+            dock.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+            restoreBtn.classList.add('hidden');
+            resetDockAutoHideTimer();
+        }
+
+        window.addEventListener('mousemove', resetDockAutoHideTimer);
+        window.addEventListener('touchstart', resetDockAutoHideTimer);
+
+
+        /* ==========================================================================
+           5. INITIALIZATION & REALTIME CLOCK
+           ========================================================================== */
+        window.onload = function() {
+            startRealTimeClock();
+            loadStoredPresets();
+            state.baseHours = state.hours;
+            state.baseMinutes = state.minutes;
+            state.baseSeconds = state.seconds;
+            
+            resetTimer();
+            renderEquipmentCheckboxes();
+            syncFormWithState();
+            renderEquipmentBadges();
+            renderRules();
+            requestWakeLock();
+        };
+
+        function startRealTimeClock() {
+            updateRealTimeClockDisplay();
+            clearInterval(realTimeInterval);
+            realTimeInterval = setInterval(updateRealTimeClockDisplay, 1000);
+        }
+
+        function updateRealTimeClockDisplay() {
+            const now = new Date();
+            const clockEl = document.getElementById('realtimeClock');
+            const dateEl = document.getElementById('realtimeDate');
+
+            const options = { hour12: !state.use24HourClock, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            clockEl.textContent = now.toLocaleTimeString([], options);
+
+            const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            dateEl.textContent = now.toLocaleDateString('en-US', dateOptions);
+        }
+
+        function toggleClockFormat() {
+            state.use24HourClock = !state.use24HourClock;
+            document.getElementById('clockFormatLabel').textContent = state.use24HourClock ? "24H" : "12H";
+            updateRealTimeClockDisplay();
+            if (state.startTime && state.targetEndTime) {
+                document.getElementById('startTimeDisplay').textContent = formatTimeOfDay(state.startTime);
+                document.getElementById('targetEndTimeDisplay').textContent = formatTimeOfDay(state.targetEndTime);
+            }
+        }
+
+
+        /* ==========================================================================
+           6. TIMER ENGINE LOGIC
+           ========================================================================== */
+        function toggleTimer() {
+            getAudioContext();
+            if (state.phase === 'idle' || state.phase === 'paused') {
+                startTimer();
+            } else {
+                pauseTimer();
+            }
+        }
+
+        function startTimer() {
+            if (state.phase === 'idle') {
+                if (state.readingMins > 0) {
+                    setPhase('reading');
+                } else {
+                    setPhase('writing');
+                }
+
+                const totalWritingSec = (state.hours * 3600) + (state.minutes * 60) + state.seconds;
+                const totalTotalSec = (state.readingMins * 60) + totalWritingSec;
+
+                state.startTime = new Date();
+                state.targetEndTime = new Date(state.startTime.getTime() + totalTotalSec * 1000);
+
+                document.getElementById('startTimeDisplay').textContent = formatTimeOfDay(state.startTime);
+                document.getElementById('targetEndTimeDisplay').textContent = formatTimeOfDay(state.targetEndTime);
+
+                triggerSound('start');
+            } else if (state.phase === 'paused') {
+                state.phase = state.previousPhase || 'writing';
+                updatePhaseUI();
+            }
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(tick, 1000);
+
+            document.getElementById('playIcon').classList.add('hidden');
+            document.getElementById('pauseIcon').classList.remove('hidden');
+            document.getElementById('btnPlayPause').classList.remove('bg-emerald-500', 'hover:bg-emerald-400');
+            document.getElementById('btnPlayPause').classList.add('bg-amber-500', 'hover:bg-amber-400');
+
+            resetDockAutoHideTimer();
+        }
+
+        function pauseTimer() {
+            state.previousPhase = state.phase;
+            state.phase = 'paused';
+            clearInterval(timerInterval);
+            updatePhaseUI();
+
+            document.getElementById('playIcon').classList.remove('hidden');
+            document.getElementById('pauseIcon').classList.add('hidden');
+            document.getElementById('btnPlayPause').classList.remove('bg-amber-500', 'hover:bg-amber-400');
+            document.getElementById('btnPlayPause').classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+
+            showDock();
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            state.phase = 'idle';
+            state.soundPlayed15m = false;
+            state.soundPlayed5m = false;
+            state.soundPlayed1m = false;
+            state.soundPlayedDone = false;
+
+            const totalWritingSec = (state.hours * 3600) + (state.minutes * 60) + state.seconds;
+
+            if (state.readingMins > 0) {
+                state.timeRemainingSec = state.readingMins * 60;
+                state.totalPhaseSec = state.readingMins * 60;
+            } else {
+                state.timeRemainingSec = totalWritingSec;
+                state.totalPhaseSec = totalWritingSec;
+            }
+
+            document.getElementById('playIcon').classList.remove('hidden');
+            document.getElementById('pauseIcon').classList.add('hidden');
+            document.getElementById('btnPlayPause').classList.remove('bg-amber-500', 'hover:bg-amber-400');
+            document.getElementById('btnPlayPause').classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+
+            document.getElementById('startTimeDisplay').textContent = "--:--";
+            document.getElementById('targetEndTimeDisplay').textContent = "--:--";
+
+            updatePhaseUI();
+            renderClock();
+            showDock();
+        }
+
+        function finishExamEarly() {
+            if (confirm("Are you sure you want to conclude the exam and trigger time expired?")) {
+                clearInterval(timerInterval);
+                state.phase = 'finished';
+                state.timeRemainingSec = 0;
+                triggerSound('done');
+                updatePhaseUI();
+                renderClock();
+                showDock();
+            }
+        }
+
+        function setPhase(newPhase) {
+            state.phase = newPhase;
+            const totalWritingSec = (state.hours * 3600) + (state.minutes * 60) + state.seconds;
+
+            if (newPhase === 'reading') {
+                state.timeRemainingSec = state.readingMins * 60;
+                state.totalPhaseSec = state.readingMins * 60;
+            } else if (newPhase === 'writing') {
+                state.timeRemainingSec = totalWritingSec;
+                state.totalPhaseSec = totalWritingSec;
+            }
+            updatePhaseUI();
+        }
+
+        function tick() {
+            if (state.timeRemainingSec > 0) {
+                state.timeRemainingSec--;
+
+                if (state.phase === 'writing') {
+                    if (state.timeRemainingSec === 900 && !state.soundPlayed15m) { // 15m
+                        triggerSound('warn');
+                        state.soundPlayed15m = true;
+                    }
+                    if (state.timeRemainingSec === 300 && !state.soundPlayed5m) { // 5m
+                        triggerSound('warn');
+                        state.soundPlayed5m = true;
+                    }
+                    if (state.timeRemainingSec === 60 && !state.soundPlayed1m) { // 1m
+                        triggerSound('warn');
+                        state.soundPlayed1m = true;
+                    }
+                }
+
+                renderClock();
+            } else {
+                if (state.phase === 'reading') {
+                    triggerSound('start');
+                    if (state.autoStartWriting) {
+                        setPhase('writing');
+                    } else {
+                        pauseTimer();
+                        setPhase('writing');
+                    }
+                } else if (state.phase === 'writing') {
+                    state.phase = 'finished';
+                    clearInterval(timerInterval);
+                    if (!state.soundPlayedDone) {
+                        triggerSound('done');
+                        state.soundPlayedDone = true;
+                    }
+                    updatePhaseUI();
+                    renderClock();
+                    showDock();
+                }
+            }
+        }
+
+        function adjustTime(deltaSeconds) {
+            state.timeRemainingSec = Math.max(0, state.timeRemainingSec + deltaSeconds);
+            state.totalPhaseSec = Math.max(state.timeRemainingSec, state.totalPhaseSec);
+
+            if (state.targetEndTime) {
+                state.targetEndTime = new Date(state.targetEndTime.getTime() + deltaSeconds * 1000);
+                document.getElementById('targetEndTimeDisplay').textContent = formatTimeOfDay(state.targetEndTime);
+            }
+            renderClock();
+        }
+
+
+        /* ==========================================================================
+           7. EXTRA TIME & DURATION COMPUTATIONS
+           ========================================================================== */
+        function stepVal(inputId, delta, minVal, maxVal) {
+            const input = document.getElementById(inputId);
+            let val = parseInt(input.value) || 0;
+            val = Math.min(maxVal, Math.max(minVal, val + delta));
+            input.value = val;
+        }
+
+        function applyQuickDuration(h, m, s) {
+            document.getElementById('inputHours').value = h;
+            document.getElementById('inputMinutes').value = m;
+            document.getElementById('inputSeconds').value = s;
+            state.extraTimePct = 0;
+            document.getElementById('extraTimeSummaryLabel').textContent = "Standard Time";
+            document.getElementById('extraTimeIndicator').classList.add('hidden');
+        }
+
+        function applyExtraTime(pct) {
+            const curH = parseInt(document.getElementById('inputHours').value) || 0;
+            const curM = parseInt(document.getElementById('inputMinutes').value) || 0;
+            const curS = parseInt(document.getElementById('inputSeconds').value) || 0;
+
+            const baseTotalSec = (curH * 3600) + (curM * 60) + curS;
+            const extraTotalSec = Math.round(baseTotalSec * (1 + (pct / 100)));
+
+            const newH = Math.floor(extraTotalSec / 3600);
+            const newM = Math.floor((extraTotalSec % 3600) / 60);
+            const newS = extraTotalSec % 60;
+
+            document.getElementById('inputHours').value = newH;
+            document.getElementById('inputMinutes').value = newM;
+            document.getElementById('inputSeconds').value = newS;
+
+            state.extraTimePct = pct;
+            const badgeText = `⚡ +${pct}% Extra Time (${newH}h ${newM}m)`;
+            document.getElementById('extraTimeSummaryLabel').textContent = badgeText;
+            document.getElementById('extraTimeBadgeText').textContent = badgeText;
+            document.getElementById('extraTimeIndicator').classList.remove('hidden');
+        }
+
+        function applyCustomExtraTime() {
+            const userPct = prompt("Enter custom extra time percentage (e.g. 20 for +20%):", "25");
+            if (userPct) {
+                const val = parseFloat(userPct);
+                if (!isNaN(val) && val > 0) {
+                    applyExtraTime(val);
+                }
+            }
+        }
+
+        function removeExtraTime() {
+            state.extraTimePct = 0;
+            document.getElementById('extraTimeSummaryLabel').textContent = "Standard Time";
+            document.getElementById('extraTimeIndicator').classList.add('hidden');
+        }
+
+
+        /* ==========================================================================
+           8. RENDERING & VISUAL SHIFTS
+           ========================================================================== */
+        function formatHHMMSS(totalSeconds) {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+
+            const pad = (num) => String(num).padStart(2, '0');
+
+            if (h > 0) {
+                return `${pad(h)}:${pad(m)}:${pad(s)}`;
+            }
+            return `${pad(m)}:${pad(s)}`;
+        }
+
+        function formatTimeOfDay(date) {
+            if (!date) return '--:--';
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !state.use24HourClock });
+        }
+
+        function setGlowIntensity(level) {
+            state.glowIntensity = level;
+            renderClock();
+        }
+
+        function renderClock() {
+            const clockEl = document.getElementById('timeDisplay');
+            const progressEl = document.getElementById('progressBar');
+            const spotlight = document.getElementById('ambientSpotlight');
+
+            clockEl.textContent = formatHHMMSS(state.timeRemainingSec);
+
+            const pct = state.totalPhaseSec > 0 ? (state.timeRemainingSec / state.totalPhaseSec) * 100 : 0;
+            progressEl.style.width = `${pct}%`;
+
+            // Reset glow classes
+            clockEl.className = "timer-digits font-mono font-extrabold tabular-nums transition-all duration-500 hc-text";
+
+            if (state.glowIntensity === 'hall') {
+                clockEl.classList.add('glow-hall');
+            } else if (state.glowIntensity === 'soft') {
+                clockEl.classList.add('glow-soft');
+            }
+
+            if (state.theme === 'highcontrast') {
+                clockEl.classList.add('text-yellow-300');
+                progressEl.className = "h-full rounded-full transition-all duration-1000 ease-linear shadow-lg bg-yellow-400";
+                spotlight.style.opacity = '0';
+                return;
+            }
+
+            if (state.phase === 'reading') {
+                clockEl.classList.add('text-purple-300', 'phase-reading-glow');
+                progressEl.className = "h-full rounded-full transition-all duration-1000 ease-linear shadow-lg bg-gradient-to-r from-purple-500 to-indigo-500";
+                spotlight.className = "ambient-spotlight bg-purple-500/25";
+                spotlight.style.opacity = '0.35';
+            } else if (state.phase === 'writing' || state.phase === 'paused') {
+                if (state.timeRemainingSec <= 300) { // < 5 mins
+                    clockEl.classList.add('text-red-500', 'phase-critical-glow', 'animate-pulse-fast');
+                    progressEl.className = "h-full rounded-full transition-all duration-1000 ease-linear shadow-lg bg-gradient-to-r from-red-600 to-rose-500";
+                    spotlight.className = "ambient-spotlight bg-red-500/35 animate-pulse-glow";
+                    spotlight.style.opacity = '0.5';
+                } else if (state.timeRemainingSec <= 600) { // < 10 mins
+                    clockEl.classList.add('text-amber-400', 'phase-warning-glow');
+                    progressEl.className = "h-full rounded-full transition-all duration-1000 ease-linear shadow-lg bg-gradient-to-r from-amber-500 to-yellow-400";
+                    spotlight.className = "ambient-spotlight bg-amber-500/30";
+                    spotlight.style.opacity = '0.4';
+                } else { // Normal writing
+                    clockEl.classList.add('text-sky-400', 'phase-writing-glow');
+                    progressEl.className = "h-full rounded-full transition-all duration-1000 ease-linear shadow-lg bg-gradient-to-r from-sky-500 to-cyan-400";
+                    spotlight.className = "ambient-spotlight bg-sky-500/20";
+                    spotlight.style.opacity = '0.25';
+                }
+            } else if (state.phase === 'finished') {
+                clockEl.textContent = "00:00";
+                clockEl.classList.add('text-red-500', 'phase-critical-glow');
+                progressEl.className = "h-full rounded-full transition-all duration-1000 ease-linear shadow-lg bg-red-600";
+                spotlight.className = "ambient-spotlight bg-red-600/40";
+                spotlight.style.opacity = '0.6';
+            }
+        }
+
+        function updatePhaseUI() {
+            const badge = document.getElementById('phaseBadge');
+            const dot = document.getElementById('phaseDot');
+            const text = document.getElementById('phaseText');
+
+            if (state.phase === 'idle') {
+                badge.className = "inline-flex items-center gap-2.5 px-6 py-2 rounded-full text-xs sm:text-sm font-black tracking-widest uppercase bg-slate-800/90 text-slate-300 border border-slate-700 shadow-xl backdrop-blur";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-slate-400";
+                text.textContent = "READY TO START";
+            } else if (state.phase === 'reading') {
+                badge.className = "inline-flex items-center gap-2.5 px-6 py-2 rounded-full text-xs sm:text-sm font-black tracking-widest uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-xl animate-pulse backdrop-blur";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-purple-400";
+                text.textContent = "READING / PLANNING TIME - NO WRITING";
+            } else if (state.phase === 'writing') {
+                badge.className = "inline-flex items-center gap-2.5 px-6 py-2 rounded-full text-xs sm:text-sm font-black tracking-widest uppercase bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xl backdrop-blur";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-sky-400";
+                text.textContent = "EXAM WRITING IN PROGRESS";
+            } else if (state.phase === 'paused') {
+                badge.className = "inline-flex items-center gap-2.5 px-6 py-2 rounded-full text-xs sm:text-sm font-black tracking-widest uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xl backdrop-blur";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-amber-400";
+                text.textContent = "EXAM PAUSED";
+            } else if (state.phase === 'finished') {
+                badge.className = "inline-flex items-center gap-2.5 px-6 py-2 rounded-full text-xs sm:text-sm font-black tracking-widest uppercase bg-red-600 text-white border border-red-500 shadow-2xl animate-bounce backdrop-blur";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-white";
+                text.textContent = "TIME EXPIRED - CEASE WRITING IMMEDIATELY";
+            }
+        }
+
+
+        /* ==========================================================================
+           9. ANNOUNCEMENT BROADCAST TICKER
+           ========================================================================== */
+        function postAnnouncement() {
+            const input = document.getElementById('inputAnnouncementText');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const banner = document.getElementById('announcementBanner');
+            const textEl = document.getElementById('announcementText');
+
+            textEl.textContent = text;
+            banner.classList.remove('hidden');
+
+            triggerSound('notice');
+            closeModal('announcementModal');
+            input.value = '';
+        }
+
+        function dismissAnnouncement() {
+            document.getElementById('announcementBanner').classList.add('hidden');
+        }
+
+
+        /* ==========================================================================
+           10. THEMES & SOUND CONTROLS
+           ========================================================================== */
+        function setTheme(themeName) {
+            state.theme = themeName;
+            const body = document.getElementById('appBody');
+
+            body.classList.remove('bg-slate-950', 'bg-navy-950', 'bg-slate-100', 'text-slate-100', 'text-slate-900', 'light-theme', 'high-contrast-theme');
+
+            if (themeName === 'dark') {
+                body.classList.add('bg-slate-950', 'text-slate-100');
+            } else if (themeName === 'navy') {
+                body.classList.add('bg-navy-950', 'text-slate-100');
+            } else if (themeName === 'light') {
+                body.classList.add('bg-slate-100', 'text-slate-900', 'light-theme');
+            } else if (themeName === 'highcontrast') {
+                body.classList.add('high-contrast-theme');
+            }
+            renderClock();
+        }
+
+        function toggleMute() {
+            state.isMuted = !state.isMuted;
+            document.getElementById('soundOnIcon').classList.toggle('hidden', state.isMuted);
+            document.getElementById('soundOffIcon').classList.toggle('hidden', !state.isMuted);
+        }
+
+
+        /* ==========================================================================
+           11. FORM & PRESETS MANAGEMENT
+           ========================================================================== */
+        function renderEquipmentCheckboxes() {
+            const container = document.getElementById('equipmentCheckboxes');
+            container.innerHTML = ALL_EQUIPMENT.map(eq => `
+                <label class="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-slate-700">
+                    <input type="checkbox" value="${eq.id}" ${state.selectedEquipment.includes(eq.id) ? 'checked' : ''} onchange="toggleEquipmentSelection('${eq.id}')" class="rounded bg-slate-950 border-slate-700 text-indigo-500 focus:ring-0">
+                    <span class="text-xs font-semibold text-slate-200">${eq.icon} ${eq.name}</span>
+                </label>
+            `).join('');
+        }
+
+        function toggleEquipmentSelection(id) {
+            if (state.selectedEquipment.includes(id)) {
+                state.selectedEquipment = state.selectedEquipment.filter(e => e !== id);
+            } else {
+                state.selectedEquipment.push(id);
+            }
+        }
+
+        function renderEquipmentBadges() {
+            const container = document.getElementById('equipmentContainer');
+            container.innerHTML = state.selectedEquipment.map(id => {
+                const eq = ALL_EQUIPMENT.find(e => e.id === id);
+                if (!eq) return '';
+                return `
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-900/90 text-slate-200 border border-slate-800 shadow-sm backdrop-blur hc-text">
+                        <span>${eq.icon}</span>
+                        <span>${eq.name}</span>
+                    </span>
+                `;
+            }).join('');
+        }
+
+        function renderRules() {
+            const container = document.getElementById('rulesList');
+            container.innerHTML = state.rules.map(r => `<span>• ${r}</span>`).join('');
+        }
+
+        function openModal(id) {
+            if (id === 'settingsModal') {
+                syncFormWithState();
+                renderPresetsList();
+            }
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function syncFormWithState() {
+            document.getElementById('inputHours').value = state.hours;
+            document.getElementById('inputMinutes').value = state.minutes;
+            document.getElementById('inputSeconds').value = state.seconds;
+
+            document.getElementById('inputReadingMins').value = state.readingMins;
+            document.getElementById('selectAutoStart').value = state.autoStartWriting ? "true" : "false";
+
+            document.getElementById('inputTitle').value = state.examTitle;
+            document.getElementById('inputSubject').value = state.subject;
+            document.getElementById('inputRoom').value = state.room;
+            document.getElementById('inputMarks').value = state.marks;
+
+            document.getElementById('inputRules').value = state.rules.join('\n');
+            document.getElementById('selectGlowIntensity').value = state.glowIntensity;
+            document.getElementById('selectSoundPreset').value = state.soundPreset;
+            document.getElementById('inputVolume').value = Math.round(state.volume * 100);
+            document.getElementById('volumeValLabel').textContent = `${Math.round(state.volume * 100)}%`;
+
+            renderEquipmentCheckboxes();
+        }
+
+        function applySettings() {
+            state.hours = parseInt(document.getElementById('inputHours').value) || 0;
+            state.minutes = parseInt(document.getElementById('inputMinutes').value) || 0;
+            state.seconds = parseInt(document.getElementById('inputSeconds').value) || 0;
+
+            state.readingMins = parseInt(document.getElementById('inputReadingMins').value) || 0;
+            state.autoStartWriting = document.getElementById('selectAutoStart').value === "true";
+
+            state.examTitle = document.getElementById('inputTitle').value.trim() || "Assessment";
+            state.subject = document.getElementById('inputSubject').value.trim() || "GENERAL";
+            state.room = document.getElementById('inputRoom').value.trim() || "Exam Room";
+            state.marks = document.getElementById('inputMarks').value.trim() || "100";
+
+            const rawRules = document.getElementById('inputRules').value;
+            state.rules = rawRules.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+
+            state.glowIntensity = document.getElementById('selectGlowIntensity').value;
+            state.soundPreset = document.getElementById('selectSoundPreset').value;
+
+            // UI updates
+            document.getElementById('examTitleDisplay').textContent = state.examTitle;
+            document.getElementById('subjectBadge').textContent = state.subject;
+            document.getElementById('roomBadge').textContent = `Room: ${state.room}`;
+            document.getElementById('marksBadge').textContent = `Total Marks: ${state.marks}`;
+
+            renderEquipmentBadges();
+            renderRules();
+
+            if (state.phase === 'idle') {
+                resetTimer();
+            } else {
+                renderClock();
+            }
+
+            closeModal('settingsModal');
+        }
+
+        function loadStoredPresets() {
+            const saved = localStorage.getItem('exam_timer_presets_v3');
+            if (saved) {
+                try {
+                    state.presets = JSON.parse(saved);
+                } catch(e) {
+                    state.presets = DEFAULT_PRESETS;
+                }
+            } else {
+                state.presets = DEFAULT_PRESETS;
+            }
+        }
+
+        function renderPresetsList() {
+            const container = document.getElementById('presetsList');
+            container.innerHTML = state.presets.map(p => `
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="font-bold text-white text-xs">${p.name}</div>
+                        <div class="text-[11px] text-slate-400">${p.hours}h ${p.minutes}m ${p.readingMins ? `+ ${p.readingMins}m Read` : ''}</div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="loadPreset('${p.id}')" class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">Load</button>
+                        <button type="button" onclick="deletePreset('${p.id}')" class="p-1 text-slate-500 hover:text-red-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadPreset(id) {
+            const p = state.presets.find(item => item.id === id);
+            if (!p) return;
+
+            state.hours = p.hours || 0;
+            state.minutes = p.minutes || 0;
+            state.seconds = p.seconds || 0;
+            state.readingMins = p.readingMins || 0;
+            state.autoStartWriting = p.autoStart !== undefined ? p.autoStart : true;
+            if (p.equipment) state.selectedEquipment = [...p.equipment];
+
+            syncFormWithState();
+            applySettings();
+        }
+
+        function saveCurrentAsPreset() {
+            const name = prompt("Enter a name for this exam preset:", `${state.subject} (${state.hours}h ${state.minutes}m)`);
+            if (!name) return;
+
+            const newPreset = {
+                id: 'preset_' + Date.now(),
+                name: name,
+                hours: parseInt(document.getElementById('inputHours').value) || 0,
+                minutes: parseInt(document.getElementById('inputMinutes').value) || 0,
+                seconds: parseInt(document.getElementById('inputSeconds').value) || 0,
+                readingMins: parseInt(document.getElementById('inputReadingMins').value) || 0,
+                autoStart: document.getElementById('selectAutoStart').value === "true",
+                equipment: [...state.selectedEquipment]
+            };
+
+            state.presets.push(newPreset);
+            localStorage.setItem('exam_timer_presets_v3', JSON.stringify(state.presets));
+            renderPresetsList();
+        }
+
+        function deletePreset(id) {
+            state.presets = state.presets.filter(p => p.id !== id);
+            localStorage.setItem('exam_timer_presets_v3', JSON.stringify(state.presets));
+            renderPresetsList();
+        }
+    </script>
+</body>
+</html>
